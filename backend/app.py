@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import praw
 import nltk
+import json
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
@@ -11,8 +12,8 @@ import os
 # Initialize Flask app
 app = Flask(__name__)
 
-# Enable CORS
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Enable CORS for all origins
+CORS(app)
 
 # Reddit API Credentials
 reddit = praw.Reddit(
@@ -34,7 +35,7 @@ nltk.download('punkt')
 stop_words = set(stopwords.words('english'))
 stemmer = PorterStemmer()
 
-# Preprocessing function for text
+# Text preprocessing function
 def preprocess_text(text):
     text = text.lower()
     words = word_tokenize(text)
@@ -57,7 +58,7 @@ def home():
 def get_adr_results():
     drug_name = request.args.get('drug_name', '').strip()
     subreddit_name = request.args.get('subreddit', 'all')
-    keyword_filter = request.args.get('keywords', '')
+    keyword_filter = request.args.get('keywords', '').strip()
 
     if not drug_name:
         return jsonify({"error": "Please provide a valid drug_name query parameter."}), 400
@@ -87,15 +88,13 @@ def get_adr_results():
                 })
 
         if not adr_results:
-            return jsonify({"message": "No ADRs detected for this drug."}), 200
+            return jsonify({"message": "No ADRs detected for this drug."})
 
         return jsonify({"drug_name": drug_name, "adr_results": adr_results})
 
     except praw.exceptions.APIException as api_error:
-        print(f"Reddit API Error: {str(api_error)}")
         return jsonify({"error": f"Reddit API Error: {str(api_error)}"}), 500
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 # Run the Flask app
