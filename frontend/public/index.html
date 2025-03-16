@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADR Detection</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-image: url('background.jpg'); /* Ensure the background image path is correct */
+      background-size: cover;
+      background-position: center;
+      color: white;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1, h3, p {
+      color: #1E3A8A; /* Dark blue color for headings */
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6); /* Shadow for better contrast */
+    }
+
+    #adrResults {
+      margin-top: 20px;
+      padding: 0 10px;
+    }
+
+    #adrResults ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    #adrResults li {
+      background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white background */
+      margin: 10px;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #ddd; /* Light border to define each comment */
+      transition: background-color 0.3s ease;
+    }
+
+    #adrResults li:hover {
+      background-color: rgba(255, 255, 255, 1); /* Fully opaque on hover */
+    }
+
+    #message {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #FF6F00; /* Orange color for error messages */
+    }
+
+    .positive {
+      background-color: #B2F2B6; /* Light teal green for positive sentiment */
+      border: 2px solid #388E3C; /* Dark green border for positive comments */
+    }
+
+    .neutral {
+      background-color: #E8F5E9; /* Light mint green for neutral sentiment */
+      border: 2px solid #81C784; /* Soft green border for neutral comments */
+    }
+
+    .negative {
+      background-color: #FFEBEE; /* Light red for negative sentiment */
+      border: 2px solid #D32F2F; /* Dark red border for negative comments */
+    }
+
+    #homeMessage p {
+      color: #F57C00; /* Orange color for welcome message */
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6); /* Shadow for readability */
+    }
+
+    #homeMessage button {
+      background-color: #1E3A8A; /* Dark blue for button */
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #homeMessage button:hover {
+      background-color: #3746A1; /* Slightly lighter blue for hover */
+    }
+
+    .sentiment {
+      font-weight: bold;
+      padding: 5px;
+      border-radius: 5px;
+    }
+
+    .sentiment-positive {
+      background-color: #B2F2B6; /* Light teal green */
+      color: #388E3C; /* Dark green */
+    }
+
+    .sentiment-neutral {
+      background-color: #E8F5E9; /* Light mint green */
+      color: #81C784; /* Soft green */
+    }
+
+    .sentiment-negative {
+      background-color: #FFEBEE; /* Light red */
+      color: #D32F2F; /* Dark red */
+    }
+
+    #adrResults h3 {
+      color: #1E3A8A; /* Dark blue color for titles */
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6); /* Shadow for better readability */
+    }
+
+    .comment-text {
+      font-size: 16px;
+      color: #333; /* Dark text color for better contrast */
+    }
+
+    #qrCodeSection {
+      margin-top: 20px;
+      display: none;
+    }
+
+    #qrCode {
+      margin-top: 10px;
+    }
+
+    /* Centered container for inputs and button */
+    .center-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    /* Padding for larger screens */
+    @media (min-width: 768px) {
+      body {
+        padding: 20px;
+      }
+
+      #adrResults {
+        margin-top: 40px;
+      }
+    }
+  </style>
+  <!-- Include QR Code library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+</head>
+<body>
+
+  <h1>ADR Detection from Reddit</h1>
+
+  <div id="homeMessage">
+    <p>Welcome to ADR Detection</p>
+    <p>Find out adverse drug reactions & discussions with ease.</p>
+    <button onclick="startSearch()">Start Searching</button>
+  </div>
+
+  <div id="searchSection" class="center-container" style="display:none;">
+    <input type="text" id="drugName" placeholder="Enter drug name" />
+    <button onclick="fetchADRData()">Search</button>
+  </div>
+
+  <div id="message"></div>
+
+  <div id="adrResults">
+    <!-- Results will be displayed here -->
+  </div>
+
+  <div id="qrCodeSection">
+    <h3>Scan QR Code for this drug information:</h3>
+    <div id="qrCode"></div>
+  </div>
+
+  <script>
+    // Function to display messages
+    function setMessage(message) {
+      document.getElementById('message').innerText = message;
+    }
+
+    // Function to display the results with sentiment categorization
+    function setResults(results) {
+      const resultsDiv = document.getElementById('adrResults');
+      resultsDiv.innerHTML = '';
+      
+      if (results.length === 0) {
+        setMessage('No ADRs detected for this drug.');
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      results.forEach(post => {
+        const li = document.createElement('li');
+        li.innerHTML = ` 
+          <h3>${post.title}</h3>
+          <p class="comment-text">${post.selftext}</p>
+          <ul>
+            ${post.comments && Array.isArray(post.comments) ? post.comments.map(comment => {
+              // Define sentiment class based on comment sentiment
+              let sentimentClass = '';
+              let sentimentText = '';
+
+              if (comment.sentiment === 'Positive') {
+                sentimentClass = 'sentiment-positive';
+                sentimentText = 'Positive';
+              } else if (comment.sentiment === 'Negative') {
+                sentimentClass = 'sentiment-negative';
+                sentimentText = 'Negative';
+              } else {
+                sentimentClass = 'sentiment-neutral';
+                sentimentText = 'Neutral';
+              }
+
+              // Ensure comments are strings or objects (convert objects to strings)
+              if (typeof comment === 'object') {
+                return `<li class="${sentimentClass}"><p class="comment-text">${JSON.stringify(comment)}</p><p class="sentiment ${sentimentClass}">${sentimentText}</p></li>`;
+              } else {
+                return `<li class="${sentimentClass}"><p class="comment-text">${comment}</p><p class="sentiment ${sentimentClass}">${sentimentText}</p></li>`;
+              }
+            }).join('') : 'No comments available.'}
+          </ul>
+        `;
+        ul.appendChild(li);
+      });
+      resultsDiv.appendChild(ul);
+    }
+
+    // Function to fetch ADR data from the backend
+    function fetchADRData() {
+      const drugNameInput = document.getElementById('drugName');
+      const drugName = drugNameInput ? drugNameInput.value.trim() : '';
+
+      if (!drugName) {
+        setMessage("Please enter a drug name.");
+        return;
+      }
+
+      console.log(`Fetching ADR data for: ${drugName}`);
+
+      // Fetch ADR results from the backend (replace with your backend URL)
+      fetch(`http://localhost:5000/get-adr-results?drug_name=${drugName}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('Data received:', data);
+          if (!data.adr_results || data.adr_results.length === 0) {
+            setMessage("No ADRs detected for this drug.");
+          } else {
+            const hasADR = data.adr_results.some(post => post.comments && post.comments.length > 0);
+            if (hasADR) {
+              setResults(data.adr_results);
+            } else {
+              setMessage("No ADRs detected for this drug.");
+            }
+          }
+          // Display the QR code after fetching the ADR data
+          displayQRCode(drugName);
+        })
+        .catch((error) => {
+          console.error('Error fetching ADR data:', error);
+          setMessage(`Failed to fetch ADR data. Please try again. ${error}`);
+        });
+    }
+
+    // Function to display QR code
+    function displayQRCode(drugName) {
+      const qrCodeSection = document.getElementById('qrCodeSection');
+      const qrCodeDiv = document.getElementById('qrCode');
+      
+      // Show the QR code section
+      qrCodeSection.style.display = 'block';
+      
+      // Generate QR code for the drug name
+      QRCode.toCanvas(qrCodeDiv, drugName, function (error) {
+        if (error) {
+          console.error(error);
+        } else {
+          console.log('QR Code generated for:', drugName);
+        }
+      });
+    }
+     
+    // Show the search section after clicking Start Searching
+    function startSearch() {
+      document.getElementById('homeMessage').style.display = 'none';
+      document.getElementById('searchSection').style.display = 'block';
+    }
+  </script>
+
+</body>
+</html>
