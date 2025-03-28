@@ -115,7 +115,7 @@ npm start
 ## 🏆 Contributors  
 | Name | Role |
 |------|------|
-| **Bhavana** | Developer & Researcher |
+| **Rishika** | Developer & Researcher |
 | Open for Collaboration! | Feel free to contribute 🚀 |
 
 ---
